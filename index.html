@@ -813,11 +813,14 @@ async function selectNovel(letter, name, autoLoadChapter = true) {
   state.currentLetter = letter;
   state.currentNovel = name;
   // 优先使用缓存中的章节列表
+  // letter 必须编码：首字母可能是 '#'（拼音认不出的书名），
+  // 而 '#' 在 URL 里是锚点分隔符 —— 不编码的话浏览器会把 "#/书名"
+  // 整段当锚点丢掉，服务端收到的 book 是空的，# 下的书就打不开。
   if (state.structure?.[letter]?.[name]) {
     state.chapterList = state.structure[letter][name];
   } else {
     try {
-      state.chapterList = await api(`/api/chapters?book=${letter}/${encodeURIComponent(name)}`);
+      state.chapterList = await api(`/api/chapters?book=${encodeURIComponent(letter)}/${encodeURIComponent(name)}`);
     } catch (e) {
       state.chapterList = [];
     }
@@ -849,7 +852,7 @@ async function selectChapter(index, save = true) {
   const novel = state.currentNovel;
 
   try {
-    const data = await api(`/api/content?book=${letter}/${encodeURIComponent(novel)}&chapter=${encodeURIComponent(state.currentChapter)}`);
+    const data = await api(`/api/content?book=${encodeURIComponent(letter)}/${encodeURIComponent(novel)}&chapter=${encodeURIComponent(state.currentChapter)}`);
     displayContent(data.content, data.chapter);
     if (save) saveProgress(letter, novel, state.currentChapter);
   } catch (e) {
