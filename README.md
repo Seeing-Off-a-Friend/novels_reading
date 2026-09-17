@@ -67,7 +67,7 @@ python server.py
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/structure` | 完整书库树 |
-| GET | `/api/chapters?book=J/剑来` | 某本书的章节列表 |
+| GET | `/api/chapters?book=J/示例书名` | 某本书的章节列表 |
 | GET | `/api/content?book=…&chapter=…` | 章节正文 |
 | GET | `/api/music` | 音乐列表 |
 | POST | `/api/ingest` | 录入章节（书名与相对路径走请求头，正文是裸字节） |
