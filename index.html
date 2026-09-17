@@ -379,11 +379,23 @@ body.dark {
 .sidebar-restore:hover { background: var(--hover-bg); }
 body.immersive .sidebar-restore { display: flex; }
 
-/* 沉浸模式：工具条和底栏淡出，鼠标移到顶部/底部才显形 */
-body.immersive .toolbar,
-body.immersive .bottom-bar { opacity: 0; transition: opacity 0.25s; }
-body.immersive .toolbar:hover,
-body.immersive .bottom-bar:hover { opacity: 1; }
+/* 沉浸模式：收起目录 + 工具条淡出。
+   —— 但底栏的「上一章 / 下一章」必须一直看得见、点得到。
+      收起目录是为了少干扰，不是为了让人翻不了章。
+
+   这里刻意【不用】position:fixed 浮起来。浮起来看着更"沉浸"，
+   但它会压住正文最后一行 —— 读小说时被盖住一行字，比少 40px 版面难受得多。
+   所以保持正常文档流，只是变薄、去掉背景和边框。 */
+body.immersive .toolbar { opacity: 0; transition: opacity 0.25s; }
+body.immersive .toolbar:hover { opacity: 1; }
+
+body.immersive .bottom-bar {
+  height: 38px;
+  min-height: 38px;
+  background: transparent;
+  border-top: none;
+  backdrop-filter: none;
+}
 
 /* ========== 侧栏分页（小说 / 音乐） ========== */
 .side-tabs { display: flex; border-bottom: 1px solid var(--border); }
