@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小说阅读器</title>
+<style>
+/* ========== Reset & Base ========== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  display: flex;
+  transition: background 0.3s, color 0.3s;
+}
+
+/* ========== Theme: Light (default) ========== */
+body.light {
+  --bg-side: #f0ece4;
+  --bg-main: #f8f6f0;
+  --bg-read: #faf8f4;
+  --text-primary: #2c2c2c;
+  --text-secondary: #888;
+  --text-muted: #aaa;
+  --accent: #8b5e3c;
+  --accent-hover: #7a5234;
+  --border: #e0dcd4;
+  --hover-bg: #e8e4dc;
+  --active-bg: #ddd8ce;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  --toolbar-bg: rgba(248,246,240,0.92);
+  --overlay: rgba(248,246,240,0.85);
+  color: var(--text-primary);
+}
+
+/* ========== Theme: Dark ========== */
+body.dark {
+  --bg-side: #1e1e1e;
+  --bg-main: #181818;
+  --bg-read: #1a1a1a;
+  --text-primary: #d4d4d4;
+  --text-secondary: #999;
+  --text-muted: #666;
+  --accent: #c4956a;
+  --accent-hover: #d4a57a;
+  --border: #333;
+  --hover-bg: #2a2a2a;
+  --active-bg: #333;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  --toolbar-bg: rgba(24,24,24,0.92);
+  --overlay: rgba(24,24,24,0.85);
+  color: var(--text-primary);
+}
+
+/* ========== Sidebar ========== */
+.sidebar {
+  width: 300px;
+  min-width: 300px;
+  height: 100vh;
+  background: var(--bg-side);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.sidebar-header {
+  padding: 16px 18px 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.sidebar-header .reload-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.sidebar-header .reload-btn:hover { background: var(--hover-bg); }
+
+/* Letter bar */
+.letter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 10px 14px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.letter-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.letter-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+.letter-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+.letter-btn.has-books { color: var(--text-primary); font-weight: 600; }
+.letter-btn.empty { opacity: 0.3; cursor: default; }
+
+/* Novel & Chapter tree */
+.tree-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.tree-area::-webkit-scrollbar { width: 4px; }
+.tree-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.novel-item {
+  padding: 8px 18px 8px 24px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s;
+  user-select: none;
+}
+.novel-item:hover { background: var(--hover-bg); }
+.novel-item.active { background: var(--active-bg); color: var(--accent); font-weight: 500; }
+.novel-item .arrow {
+  font-size: 10px;
+  transition: transform 0.2s;
+  color: var(--text-muted);
+}
+.novel-item .arrow.open { transform: rotate(90deg); }
+.novel-item .count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.chapter-list { display: none; }
+.chapter-list.open { display: block; }
+
+.chapter-item {
+  padding: 6px 18px 6px 44px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+.chapter-item:hover { background: var(--hover-bg); color: var(--text-primary); }
+.chapter-item.active {
+  color: var(--accent);
+  font-weight: 500;
+  background: var(--active-bg);
+}
+
+/* ========== Main Area ========== */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-main);
+  transition: background 0.3s;
+  overflow: hidden;
+}
+
+/* Toolbar */
+.toolbar {
+  height: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+  background: var(--toolbar-bg);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.toolbar-group + .toolbar-group { margin-left: 16px; }
+
+.toolbar-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.tool-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.tool-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+.tool-btn:active { background: var(--active-bg); }
+
+.font-size-display {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 28px;
+  text-align: center;
+  user-select: none;
+}
+
+/* Background upload */
+.bg-upload-wrap { position: relative; }
+.bg-upload-wrap input[type="file"] {
+  position: absolute;
+  opacity: 0;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+
+/* Reader */
+.reader-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  transition: background 0.3s;
+}
+.reader-area::-webkit-scrollbar { width: 6px; }
+.reader-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.reader-inner {
+  width: 100%;
+  max-width: 820px;
+  padding: 40px 48px 60px;
+  min-height: 100%;
+  line-height: 1.9;
+  font-size: 18px;
+  font-family: "Noto Serif SC", "Source Han Serif SC", "STSong", serif;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  position: relative;
+  z-index: 1;
+}
+
+/* Background image support */
+.reader-area.has-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--overlay);
+  z-index: 0;
+}
+.reader-area.has-bg {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  user-select: none;
+  gap: 12px;
+}
+.empty-state .icon { font-size: 48px; opacity: 0.4; }
+.empty-state .text { font-size: 15px; }
+
+/* Chapter title within content */
+.reader-inner .chapter-title {
+  text-align: center;
+  font-size: 1.2em;
+  font-weight: 600;
+  padding: 32px 0 24px;
+  color: var(--accent);
+}
+
+/* Bottom bar */
+.bottom-bar {
+  height: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: var(--toolbar-bg);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--border);
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.bottom-bar .nav-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.bottom-bar .nav-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+.bottom-bar .nav-btn:disabled { opacity: 0.3; cursor: default; }
+.bottom-bar .nav-btn:disabled:hover { background: none; color: var(--text-secondary); }
+
+.bottom-bar .chapter-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  user-select: none;
+}
+.bottom-bar .chapter-label span { color: var(--accent); }
+
+/* ========== 侧栏：可收起（沉浸式阅读） ========== */
+.sidebar {
+  transition: width 0.25s ease, min-width 0.25s ease, background 0.3s, border-color 0.3s;
+}
+.sidebar.collapsed { width: 0; min-width: 0; border-right: none; }
+.sidebar.collapsed > * { display: none; }
+
+/* 收起后左上角浮出的恢复按钮 */
+.sidebar-restore {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 50;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--toolbar-bg);
+  backdrop-filter: blur(8px);
+  color: var(--accent);
+  font-size: 15px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.sidebar-restore:hover { background: var(--hover-bg); }
+body.immersive .sidebar-restore { display: flex; }
+
+/* 沉浸模式：工具条和底栏淡出，鼠标移到顶部/底部才显形 */
+body.immersive .toolbar,
+body.immersive .bottom-bar { opacity: 0; transition: opacity 0.25s; }
+body.immersive .toolbar:hover,
+body.immersive .bottom-bar:hover { opacity: 1; }
+
+/* ========== 侧栏分页（小说 / 音乐） ========== */
+.side-tabs { display: flex; border-bottom: 1px solid var(--border); }
+.side-tab {
+  flex: 1;
+  padding: 9px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.side-tab:hover { background: var(--hover-bg); }
+.side-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+.side-pane { display: none; flex: 1; min-height: 0; flex-direction: column; }
+.side-pane.active { display: flex; }
+
+/* ========== 音乐 ========== */
+.music-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.music-controls .tool-btn:disabled { opacity: 0.3; cursor: default; }
+.music-controls .tool-btn:disabled:hover { background: transparent; color: var(--text-secondary); }
+.music-time { font-size: 11px; color: var(--text-muted); margin-left: 6px; user-select: none; }
+
+.music-now {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+.music-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+.music-list::-webkit-scrollbar { width: 4px; }
+.music-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.music-item {
+  padding: 7px 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  user-select: none;
+}
+.music-item:hover { background: var(--hover-bg); color: var(--text-primary); }
+.music-item.active { color: var(--accent); font-weight: 500; background: var(--active-bg); }
+.music-item .idx { color: var(--text-muted); font-size: 11px; min-width: 20px; text-align: right; }
+.music-item .nm { overflow: hidden; text-overflow: ellipsis; }
+
+.music-hint {
+  padding: 24px 18px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.9;
+}
+
+/* ========== 拖拽录入 ========== */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--overlay);
+  backdrop-filter: blur(4px);
+  border: 3px dashed var(--accent);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.drop-overlay.show { display: flex; }
+.drop-overlay .big { font-size: 46px; text-align: center; }
+.drop-overlay .t { font-size: 17px; margin-top: 12px; font-weight: 600; color: var(--accent); text-align: center; }
+.drop-overlay .s { font-size: 12px; margin-top: 10px; color: var(--text-secondary); text-align: center; line-height: 1.9; }
+
+/* ========== 提示气泡 ========== */
+.toast {
+  position: fixed;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 120;
+  max-width: 78vw;
+  padding: 11px 20px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.7;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  white-space: pre-line;
+  text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(-8px); }
+
+/* ========== 导入按钮 ========== */
+.import-btn {
+  width: auto;
+  padding: 0 12px;
+  gap: 5px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+}
+
+/* 侧栏头部的按钮组 */
+.hdr-btns { display: flex; gap: 6px; }
+
+/* ========== Responsive ========== */
+@media (max-width: 720px) {
+  .sidebar { width: 240px; min-width: 240px; }
+  .reader-inner { padding: 24px 20px 40px; font-size: 16px; }
+  .toolbar { padding: 0 12px; gap: 4px; }
+  .toolbar-group + .toolbar-group { margin-left: 8px; }
+}
+
+@media (max-width: 500px) {
+  .sidebar { width: 100%; min-width: 100%; }
+}
+</style>
+</head>
+<body class="light">
+
+<!-- ===== Sidebar ===== -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <span>📖 小说阅读器</span>
+    <span class="hdr-btns">
+      <button class="reload-btn" onclick="reloadAll()" title="重新扫描目录">↻</button>
+      <button class="reload-btn" onclick="toggleImmersive(true)" title="收起目录，进入沉浸式阅读（快捷键 \）">⇤</button>
+    </span>
+  </div>
+
+  <div class="side-tabs">
+    <button class="side-tab active" data-tab="novel" onclick="switchTab('novel')">📖 小说</button>
+    <button class="side-tab" data-tab="music" onclick="switchTab('music')">🎵 音乐</button>
+  </div>
+
+  <!-- 小说：字母 + 书籍/章节树 -->
+  <div class="side-pane active" id="paneNovel">
+    <div class="letter-bar" id="letterBar"></div>
+    <div class="tree-area" id="treeArea">
+      <div class="empty-state" style="padding:40px 20px;">
+        <div class="text">正在扫描小说目录...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 音乐：播放控制 + 曲目列表 -->
+  <div class="side-pane" id="paneMusic">
+    <div class="music-controls">
+      <button class="tool-btn" id="mPrev" onclick="musicPrev()" title="上一首 / 重头播放">⏮</button>
+      <button class="tool-btn" id="mPlay" onclick="musicToggle()" title="播放 / 暂停">▶</button>
+      <button class="tool-btn" id="mNext" onclick="musicNext()" title="下一首">⏭</button>
+      <span class="music-time" id="mTime">--:--</span>
+    </div>
+    <div class="music-now" id="mNow">未选择曲目</div>
+    <div class="music-list" id="musicList">
+      <div class="music-hint">音乐库是空的<br>把 mp3 / flac / m4a 拖进窗口即可录入</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Main ===== -->
+<div class="main">
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <button class="tool-btn" onclick="toggleImmersive()" id="immersiveBtn" title="沉浸式阅读：收起目录（快捷键 \）">⛶</button>
+    </div>
+    <div class="toolbar-group">
+      <button class="tool-btn import-btn" onclick="onImportClick()" id="importBtn"
+              title="导入：在「小说」页选中书的文件夹（文件夹名会作为书名）；在「音乐」页选音频文件">📥 导入</button>
+    </div>
+    <div class="toolbar-group">
+      <span class="toolbar-label">字号</span>
+      <button class="tool-btn" onclick="changeFontSize(-2)" title="缩小">A−</button>
+      <span class="font-size-display" id="fontSizeDisplay">18</span>
+      <button class="tool-btn" onclick="changeFontSize(2)" title="放大">A+</button>
+    </div>
+    <div class="toolbar-group">
+      <button class="tool-btn" onclick="toggleTheme()" id="themeBtn" title="切换日夜模式">🌙</button>
+    </div>
+    <div class="toolbar-group bg-upload-wrap">
+      <button class="tool-btn" title="上传背景图片">🖼</button>
+      <input type="file" accept="image/*" onchange="uploadBg(event)">
+    </div>
+    <div class="toolbar-group">
+      <button class="tool-btn" onclick="clearBg()" title="移除背景图片">✕</button>
+    </div>
+  </div>
+
+  <!-- Reader -->
+  <div class="reader-area" id="readerArea">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">📚</div>
+      <div class="text">从左侧选择小说和章节</div>
+    </div>
+    <div class="reader-inner" id="readerInner" style="display:none;"></div>
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="bottom-bar" id="bottomBar">
+    <button class="nav-btn" id="prevBtn" onclick="navChapter(-1)" disabled>◀ 上一章</button>
+    <div class="chapter-label" id="chapterLabel">未选择章节</div>
+    <button class="nav-btn" id="nextBtn" onclick="navChapter(1)" disabled>下一章 ▶</button>
+  </div>
+</div>
+
+<!-- ===== 拖拽录入提示层 ===== -->
+<div class="drop-overlay" id="dropOverlay">
+  <div>
+    <div class="big">📥</div>
+    <div class="t">松手即可录入</div>
+    <div class="s">
+      <b>文件夹</b> → 小说（文件夹名作为书名，按拼音首字母自动归档）<br>
+      <b>音频文件</b> → 音乐库（mp3 / flac / m4a / wav / ogg…）
+    </div>
+  </div>
+</div>
+
+<!-- ===== 提示气泡 ===== -->
+<div class="toast" id="toast"></div>
+
+<!-- ===== 侧栏收起后的恢复入口 ===== -->
+<button class="sidebar-restore" id="sidebarRestore" onclick="toggleImmersive(false)" title="展开目录">☰</button>
+
+<!-- ===== 播放器本体 ===== -->
+<audio id="audio" preload="metadata"></audio>
+
+<!-- ===== 「导入」按钮用的隐藏选择器 =====
+     小说：webkitdirectory 让选择器变成"选文件夹"；
+     音乐：普通多选文件。 -->
+<input type="file" id="novelPick" webkitdirectory directory multiple style="display:none">
+<input type="file" id="musicPick" multiple style="display:none"
+       accept=".mp3,.m4a,.flac,.wav,.ogg,.aac,.opus,.wma,audio/*">
+
+<script>
+// ============================================================
+// State
+// ============================================================
+const state = {
+  structure: null,       // { J: { 剑来: [ch1, ch2, ...] }, ... }
+  currentLetter: null,   // e.g. 'J'
+  currentNovel: null,    // e.g. '剑来'
+  currentChapter: null,  // e.g. '第1章 少年游.txt'
+  chapterList: [],       // current novel's chapter array
+  chapterIndex: -1,      // index in chapterList
+  fontSize: 18,
+  theme: 'light',
+};
+
+// ============================================================
+// Init
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  loadSettings();
+  applyTheme(state.theme);
+  // 主题按钮的文字要和实际主题对上（原来只在切换时才更新，刷新后就反了）
+  document.getElementById('themeBtn').textContent = state.theme === 'light' ? '🌙' : '☀';
+  applyFontSize();
+  loadMusic();
+  loadStructure().then(() => {
+    // Restore last reading position
+    const last = getSavedProgress();
+    if (last && state.structure) {
+      // Try to locate the saved book/chapter
+      for (const [letter, novels] of Object.entries(state.structure)) {
+        if (novels[last.novel]) {
+          setTimeout(() => {
+            selectNovel(letter, last.novel, false);
+            const idx = state.chapterList.indexOf(last.chapter);
+            if (idx !== -1) {
+              selectChapter(idx, false);
+            }
+          }, 100);
+          break;
+        }
+      }
+    }
+  });
+});
+
+// ============================================================
+// API calls
+// ============================================================
+async function api(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error('API error');
+  return res.json();
+}
+
+// ============================================================
+// Load directory structure
+// ============================================================
+async function loadStructure() {
+  try {
+    state.structure = await api('/api/structure');
+  } catch (e) {
+    document.getElementById('treeArea').innerHTML =
+      `<div class="empty-state" style="padding:40px 20px;"><div class="text">无法连接服务器</div></div>`;
+    return;
+  }
+  renderLetterBar();
+  renderTree();
+}
+
+function renderLetterBar() {
+  const bar = document.getElementById('letterBar');
+  bar.innerHTML = '';
+  // '#' 收纳拼音首字母识别不出来的书名（生僻字、数字或符号开头），有才显示
+  let allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if (state.structure && state.structure['#']) allLetters += '#';
+  for (const ch of allLetters) {
+    const btn = document.createElement('button');
+    btn.className = 'letter-btn';
+    btn.dataset.letter = ch;
+    btn.textContent = ch;
+    if (state.structure && state.structure[ch]) {
+      btn.classList.add('has-books');
+    } else {
+      btn.classList.add('empty');
+    }
+    if (ch === state.currentLetter) btn.classList.add('active');
+    btn.addEventListener('click', () => onLetterClick(ch));
+    bar.appendChild(btn);
+  }
+}
+
+function onLetterClick(letter) {
+  if (!state.structure || !state.structure[letter]) return;
+  state.currentLetter = letter;
+  // Update letter bar
+  document.querySelectorAll('.letter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.letter === letter);
+  });
+  renderTree();
+}
+
+function renderTree() {
+  const area = document.getElementById('treeArea');
+  area.innerHTML = '';
+
+  if (!state.currentLetter || !state.structure || !state.structure[state.currentLetter]) {
+    area.innerHTML = `<div class="empty-state" style="padding:40px 20px;">
+      <div class="text">选择上方字母查看小说</div></div>`;
+    return;
+  }
+
+  const novels = state.structure[state.currentLetter];
+  for (const [name, chapters] of Object.entries(novels)) {
+    const novelDiv = document.createElement('div');
+    novelDiv.className = 'novel-item' + (name === state.currentNovel ? ' active' : '');
+    novelDiv.innerHTML = `
+      <span class="arrow ${name === state.currentNovel ? 'open' : ''}">▶</span>
+      <span>${name}</span>
+      <span class="count">${chapters.length}章</span>
+    `;
+    novelDiv.addEventListener('click', () => {
+      const isSame = name === state.currentNovel;
+      if (isSame) {
+        // toggle collapse
+        state.currentNovel = null;
+        state.chapterList = [];
+      } else {
+        selectNovel(state.currentLetter, name);
+      }
+      renderTree();
+    });
+
+    area.appendChild(novelDiv);
+
+    // Chapter list
+    if (name === state.currentNovel) {
+      const chList = document.createElement('div');
+      chList.className = 'chapter-list open';
+      chapters.forEach((ch, idx) => {
+        const chDiv = document.createElement('div');
+        chDiv.className = 'chapter-item' + (ch === state.currentChapter ? ' active' : '');
+        chDiv.textContent = ch.replace('.txt', '');
+        chDiv.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectChapter(idx);
+        });
+        chList.appendChild(chDiv);
+      });
+      area.appendChild(chList);
+    }
+  }
+}
+
+// ============================================================
+// Select novel / chapter
+// ============================================================
+async function selectNovel(letter, name, autoLoadChapter = true) {
+  state.currentLetter = letter;
+  state.currentNovel = name;
+  // 优先使用缓存中的章节列表
+  if (state.structure?.[letter]?.[name]) {
+    state.chapterList = state.structure[letter][name];
+  } else {
+    try {
+      state.chapterList = await api(`/api/chapters?book=${letter}/${encodeURIComponent(name)}`);
+    } catch (e) {
+      state.chapterList = [];
+    }
+  }
+
+  // Update letter bar
+  document.querySelectorAll('.letter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.letter === letter);
+  });
+
+  if (autoLoadChapter && state.chapterList.length > 0) {
+    // Try to restore saved chapter for this novel
+    const saved = getSavedProgress();
+    if (saved && saved.novel === name) {
+      const idx = state.chapterList.indexOf(saved.chapter);
+      if (idx !== -1) { selectChapter(idx, false); renderTree(); return; }
+    }
+    selectChapter(0, false);
+  }
+  renderTree();
+}
+
+async function selectChapter(index, save = true) {
+  if (!state.chapterList || index < 0 || index >= state.chapterList.length) return;
+
+  state.chapterIndex = index;
+  state.currentChapter = state.chapterList[index];
+  const letter = state.currentLetter;
+  const novel = state.currentNovel;
+
+  try {
+    const data = await api(`/api/content?book=${letter}/${encodeURIComponent(novel)}&chapter=${encodeURIComponent(state.currentChapter)}`);
+    displayContent(data.content, data.chapter);
+    if (save) saveProgress(letter, novel, state.currentChapter);
+  } catch (e) {
+    document.getElementById('readerInner').textContent = '加载失败';
+  }
+
+  // Update sidebar highlight
+  document.querySelectorAll('.chapter-item').forEach(el => {
+    el.classList.toggle('active', el.textContent === state.currentChapter.replace('.txt', ''));
+  });
+  document.querySelectorAll('.novel-item').forEach(el => {
+    const nameSpan = el.querySelector('span:nth-child(2)');
+    el.classList.toggle('active', nameSpan && nameSpan.textContent === novel);
+    const arrow = el.querySelector('.arrow');
+    if (arrow) arrow.classList.toggle('open', nameSpan && nameSpan.textContent === novel);
+  });
+
+  // Update bottom bar
+  updateBottomBar();
+
+  // Scroll to top
+  document.getElementById('readerArea').scrollTop = 0;
+}
+
+function displayContent(content, chapterName) {
+  const empty = document.getElementById('emptyState');
+  const inner = document.getElementById('readerInner');
+  empty.style.display = 'none';
+  inner.style.display = 'block';
+
+  // Split title from content
+  const title = chapterName.replace('.txt', '');
+  inner.innerHTML = `<div class="chapter-title">${escapeHtml(title)}</div>${escapeHtml(content)}`;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ============================================================
+// Navigation
+// ============================================================
+function navChapter(delta) {
+  const idx = state.chapterIndex + delta;
+  if (idx < 0 || idx >= state.chapterList.length) return;
+  selectChapter(idx);
+}
+
+function updateBottomBar() {
+  const label = document.getElementById('chapterLabel');
+  const prev = document.getElementById('prevBtn');
+  const next = document.getElementById('nextBtn');
+
+  if (state.currentChapter) {
+    const display = state.currentChapter.replace('.txt', '');
+    label.innerHTML = `<span>${display}</span>`;
+  } else {
+    label.textContent = '未选择章节';
+  }
+
+  prev.disabled = state.chapterIndex <= 0;
+  next.disabled = state.chapterIndex >= state.chapterList.length - 1;
+}
+
+// ============================================================
+// Font size
+// ============================================================
+function changeFontSize(delta) {
+  state.fontSize = Math.min(36, Math.max(12, state.fontSize + delta));
+  applyFontSize();
+  saveSettings();
+}
+
+function applyFontSize() {
+  document.getElementById('readerInner').style.fontSize = state.fontSize + 'px';
+  document.getElementById('fontSizeDisplay').textContent = state.fontSize;
+}
+
+// ============================================================
+// Theme
+// ============================================================
+function toggleTheme() {
+  state.theme = state.theme === 'light' ? 'dark' : 'light';
+  applyTheme(state.theme);
+  saveSettings();
+  document.getElementById('themeBtn').textContent = state.theme === 'light' ? '🌙' : '☀';
+}
+
+function applyTheme(theme) {
+  document.body.className = theme;
+}
+
+// ============================================================
+// Background image
+// ============================================================
+function uploadBg(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const readerArea = document.getElementById('readerArea');
+    readerArea.style.backgroundImage = `url(${e.target.result})`;
+    readerArea.classList.add('has-bg');
+    localStorage.setItem('readerBg', e.target.result);
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function clearBg() {
+  const readerArea = document.getElementById('readerArea');
+  readerArea.style.backgroundImage = '';
+  readerArea.classList.remove('has-bg');
+  localStorage.removeItem('readerBg');
+}
+
+function loadBg() {
+  const saved = localStorage.getItem('readerBg');
+  if (saved) {
+    const readerArea = document.getElementById('readerArea');
+    readerArea.style.backgroundImage = `url(${saved})`;
+    readerArea.classList.add('has-bg');
+  }
+}
+
+// ============================================================
+// Save / Load settings (localStorage)
+// ============================================================
+function saveSettings() {
+  localStorage.setItem('readerFontSize', state.fontSize);
+  localStorage.setItem('readerTheme', state.theme);
+}
+
+function loadSettings() {
+  const fs = localStorage.getItem('readerFontSize');
+  if (fs) state.fontSize = parseInt(fs, 10) || 18;
+  const theme = localStorage.getItem('readerTheme');
+  if (theme) state.theme = theme;
+  loadBg();
+}
+
+function saveProgress(letter, novel, chapter) {
+  localStorage.setItem('readerLastLetter', letter);
+  localStorage.setItem('readerLastNovel', novel);
+  localStorage.setItem('readerLastChapter', chapter);
+}
+
+function getSavedProgress() {
+  const letter = localStorage.getItem('readerLastLetter');
+  const novel = localStorage.getItem('readerLastNovel');
+  const chapter = localStorage.getItem('readerLastChapter');
+  if (letter && novel && chapter) return { letter, novel, chapter };
+  return null;
+}
+
+// ============================================================
+// 侧栏分页
+// ============================================================
+function switchTab(name) {
+  document.querySelectorAll('.side-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === name));
+  document.getElementById('paneNovel').classList.toggle('active', name === 'novel');
+  document.getElementById('paneMusic').classList.toggle('active', name === 'music');
+}
+
+// ============================================================
+// 沉浸式阅读：收起目录，工具条与底栏淡出（鼠标移上去再显形）
+// ============================================================
+function toggleImmersive(force) {
+  const on = (force === undefined)
+    ? !document.body.classList.contains('immersive')
+    : force;
+  document.body.classList.toggle('immersive', on);
+  document.getElementById('sidebar').classList.toggle('collapsed', on);
+}
+
+// ============================================================
+// 提示气泡
+// ============================================================
+let toastTimer = null;
+function toast(msg, ms) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms || 3200);
+}
+
+function reloadAll() {
+  loadStructure();
+  loadMusic();
+}
+
+// ============================================================
+// 本地音乐
+// ============================================================
+const audioEl = document.getElementById('audio');
+let musicFiles = [];     // [{name, size}]
+let musicIndex = -1;
+
+async function loadMusic() {
+  try {
+    musicFiles = await api('/api/music');
+  } catch (e) {
+    musicFiles = [];
+  }
+  renderMusic();
+}
+
+function renderMusic() {
+  const box = document.getElementById('musicList');
+  const nowEl = document.getElementById('mNow');
+  box.innerHTML = '';
+
+  if (!musicFiles.length) {
+    box.innerHTML = '<div class="music-hint">音乐库是空的<br>把 mp3 / flac / m4a 拖进窗口即可录入</div>';
+    nowEl.textContent = '未选择曲目';
+    updateMusicButtons();
+    return;
+  }
+
+  musicFiles.forEach((m, i) => {
+    const d = document.createElement('div');
+    d.className = 'music-item' + (i === musicIndex ? ' active' : '');
+    d.title = m.name + '  (' + fmtSize(m.size) + ')';
+    const idx = document.createElement('span');
+    idx.className = 'idx';
+    idx.textContent = i + 1;
+    const nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = m.name;
+    d.append(idx, nm);
+    d.addEventListener('click', () => musicPlay(i));
+    box.appendChild(d);
+  });
+
+  nowEl.textContent = (musicIndex >= 0 && musicFiles[musicIndex])
+    ? '♪ ' + musicFiles[musicIndex].name
+    : '未选择曲目';
+  updateMusicButtons();
+}
+
+function fmtSize(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return Math.round(n / 1024) + ' KB';
+  return (n / 1048576).toFixed(1) + ' MB';
+}
+
+function fmtTime(s) {
+  if (!isFinite(s) || s < 0) return '--:--';
+  const m = Math.floor(s / 60);
+  const ss = Math.floor(s % 60);
+  return m + ':' + String(ss).padStart(2, '0');
+}
+
+function musicPlay(i) {
+  if (!musicFiles.length) return;
+  musicIndex = ((i % musicFiles.length) + musicFiles.length) % musicFiles.length;
+  audioEl.src = '/music/' + encodeURIComponent(musicFiles[musicIndex].name);
+  audioEl.play().catch(() => {});
+  renderMusic();
+}
+
+function musicToggle() {
+  if (!musicFiles.length) { toast('音乐库是空的，先把音频拖进窗口'); return; }
+  if (musicIndex < 0) { musicPlay(0); return; }
+  if (audioEl.paused) audioEl.play().catch(() => {}); else audioEl.pause();
+}
+
+function musicNext() {
+  if (!musicFiles.length) return;
+  musicPlay(musicIndex + 1);
+}
+
+function musicPrev() {
+  if (!musicFiles.length) return;
+  // 播过 3 秒就先回到开头，和常见播放器一致
+  if (musicIndex >= 0 && audioEl.currentTime > 3) { audioEl.currentTime = 0; return; }
+  musicPlay(musicIndex - 1);
+}
+
+function updateMusicButtons() {
+  const has = musicFiles.length > 0;
+  const playing = has && musicIndex >= 0 && !audioEl.paused;
+  document.getElementById('mPlay').textContent = playing ? '⏸' : '▶';
+  document.getElementById('mPrev').disabled = !has;
+  document.getElementById('mNext').disabled = !has;
+}
+
+audioEl.addEventListener('play', updateMusicButtons);
+audioEl.addEventListener('pause', updateMusicButtons);
+audioEl.addEventListener('ended', () => musicNext());
+audioEl.addEventListener('timeupdate', () => {
+  document.getElementById('mTime').textContent =
+    fmtTime(audioEl.currentTime) + ' / ' + fmtTime(audioEl.duration);
+});
+audioEl.addEventListener('error', () => {
+  if (musicIndex >= 0 && musicFiles[musicIndex]) {
+    toast('这首播不了：' + musicFiles[musicIndex].name);
+  }
+});
+
+// ============================================================
+// 拖拽录入
+//
+// 浏览器出于安全不给拖入项的完整路径，所以用 File and Directory
+// Entries API：webkitGetAsEntry() 拿目录句柄，再递归读。
+// 关键点：readEntries() 一次只返回一批，必须反复调用到返回空数组，
+// 否则大文件夹会只录进去一部分。
+// ============================================================
+const AUDIO_EXT = ['.mp3', '.m4a', '.flac', '.wav', '.ogg', '.aac', '.opus', '.wma'];
+
+function isAudioName(name) {
+  const n = name.toLowerCase();
+  return AUDIO_EXT.some(ext => n.endsWith(ext));
+}
+function isTextName(name) {
+  return name.toLowerCase().endsWith('.txt');
+}
+function baseName(path) {
+  const i = path.lastIndexOf('/');
+  return i === -1 ? path : path.slice(i + 1);
+}
+function hasFiles(e) {
+  return !!(e.dataTransfer && Array.from(e.dataTransfer.types || []).indexOf('Files') !== -1);
+}
+
+function readAllEntries(dirEntry) {
+  const reader = dirEntry.createReader();
+  return new Promise((resolve, reject) => {
+    const all = [];
+    const next = () => reader.readEntries(batch => {
+      if (!batch.length) { resolve(all); return; }
+      all.push(...batch);
+      next();
+    }, reject);
+    next();
+  });
+}
+
+async function collectFromEntry(entry, prefix, out) {
+  const rel = prefix ? prefix + '/' + entry.name : entry.name;
+  if (entry.isFile) {
+    const f = await new Promise(res => entry.file(res, () => res(null)));
+    if (f) out.push({ file: f, rel });
+  } else if (entry.isDirectory) {
+    const children = await readAllEntries(entry);
+    for (const c of children) await collectFromEntry(c, rel, out);
+  }
+}
+
+const dropOverlay = document.getElementById('dropOverlay');
+let dragDepth = 0;
+
+window.addEventListener('dragenter', e => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth++;
+  dropOverlay.classList.add('show');
+});
+window.addEventListener('dragover', e => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+});
+window.addEventListener('dragleave', e => {
+  if (!hasFiles(e)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) dropOverlay.classList.remove('show');
+});
+window.addEventListener('drop', async e => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  dropOverlay.classList.remove('show');
+  try {
+    await handleDrop(e.dataTransfer);
+  } catch (err) {
+    toast('录入出错：' + err.message);
+  }
+});
+
+async function handleDrop(dt) {
+  const novels = [];     // { name, files: [{file, rel}] }
+  const audios = [];     // { file, name }
+  const looseTxt = [];
+
+  const entries = [];
+  for (const item of Array.from(dt.items || [])) {
+    if (item.kind !== 'file') continue;
+    const ent = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+    if (ent) entries.push(ent);
+  }
+
+  if (!entries.length) {
+    // 浏览器不支持目录 API 时的退化路径
+    for (const f of Array.from(dt.files || [])) {
+      if (isAudioName(f.name)) audios.push({ file: f, name: f.name });
+      else if (isTextName(f.name)) looseTxt.push(f.name);
+    }
+  } else {
+    for (const ent of entries) {
+      if (ent.isDirectory) {
+        // 顶层文件夹 = 一本书，文件夹名就是书名
+        const collected = [];
+        await collectFromEntry(ent, '', collected);
+        const txts = collected.filter(x => isTextName(x.rel));
+        if (txts.length) novels.push({ name: ent.name, files: txts });
+        for (const x of collected) {
+          if (isAudioName(x.rel)) audios.push({ file: x.file, name: baseName(x.rel) });
+        }
+      } else if (ent.isFile) {
+        const f = await new Promise(res => ent.file(res, () => res(null)));
+        if (!f) continue;
+        if (isAudioName(f.name)) audios.push({ file: f, name: f.name });
+        else if (isTextName(f.name)) looseTxt.push(f.name);
+      }
+    }
+  }
+
+  await ingestAll(novels, audios, looseTxt);
+}
+
+async function postRaw(url, blob, headers) {
+  const res = await fetch(url, { method: 'POST', body: blob, headers });
+  if (!res.ok) {
+    let msg = 'HTTP ' + res.status;
+    try { msg = (await res.json()).error || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+async function ingestAll(novels, audios, looseTxt) {
+  const total = novels.reduce((n, b) => n + b.files.length, 0) + audios.length;
+  if (!total) {
+    toast(looseTxt.length
+      ? '识别到 ' + looseTxt.length + ' 个散装 .txt。\n请把整个文件夹拖进来 —— 文件夹名会作为书名。'
+      : '没识别到小说文件夹或音频文件');
+    return;
+  }
+
+  let done = 0, failed = 0;
+  const lines = [];
+
+  for (const book of novels) {
+    let okCount = 0;
+    for (const item of book.files) {
+      try {
+        await postRaw('/api/ingest', item.file, {
+          'X-Book-Name': encodeURIComponent(book.name),
+          'X-Rel-Path': encodeURIComponent(item.rel),
+        });
+        okCount++;
+      } catch (e) { failed++; }
+      done++;
+      toast('录入《' + book.name + '》\n' + done + ' / ' + total, 600000);
+    }
+    lines.push('《' + book.name + '》' + okCount + ' 章');
+  }
+
+  for (const a of audios) {
+    try {
+      await postRaw('/api/music/upload', a.file, {
+        'X-File-Name': encodeURIComponent(a.name),
+      });
+    } catch (e) { failed++; }
+    done++;
+    toast('录入音乐\n' + done + ' / ' + total, 600000);
+  }
+
+  if (novels.length) await loadStructure();
+  if (audios.length) await loadMusic();
+
+  let msg = lines.join('\n');
+  if (audios.length) msg += (msg ? '\n' : '') + '音乐 ' + audios.length + ' 首';
+  if (looseTxt.length) msg += (msg ? '\n' : '') + '已忽略散装 txt ' + looseTxt.length + ' 个';
+  if (failed) msg += (msg ? '\n' : '') + '失败 ' + failed + ' 项';
+  toast(msg || '完成', 5000);
+}
+
+// ============================================================
+// 「导入」按钮
+//
+// 和拖拽是同一套归档逻辑，只是入口不同：
+//   小说页 → 弹文件夹选择器（webkitdirectory）
+//   音乐页 → 弹音频文件选择器
+// 不想拖拽、或者拖拽不灵的时候用这个。
+// ============================================================
+const novelPickInput = document.getElementById('novelPick');
+const musicPickInput = document.getElementById('musicPick');
+
+function onImportClick() {
+  const onMusic = document.getElementById('paneMusic').classList.contains('active');
+  if (onMusic) musicPickInput.click();
+  else novelPickInput.click();
+}
+
+novelPickInput.addEventListener('change', (e) => {
+  const files = Array.from(e.target.files || []);
+  e.target.value = '';        // 清空，方便反复选同一个文件夹
+  importFolderFiles(files);
+});
+
+musicPickInput.addEventListener('change', (e) => {
+  const files = Array.from(e.target.files || []);
+  e.target.value = '';
+  const audios = files.filter(f => isAudioName(f.name)).map(f => ({ file: f, name: f.name }));
+  if (!audios.length) { toast('没有识别到音频文件'); return; }
+  ingestAll([], audios, []);
+});
+
+function importFolderFiles(files) {
+  // 规则和拖拽完全一致，只有一条，不做任何猜测：
+  //     选中的那一层文件夹名 = 书名
+  //     里面的子目录原样保留（阅读器递归扫描，分卷不会被漏掉）
+  //
+  // 试过"如果 txt 在更深一层就把子文件夹当书"的智能识别，但它分不清
+  // 《剑来/第一卷/第一章.txt》里的"第一卷"是卷还是书 —— 信息本身不够，
+  // 猜错反而更糟。可预测比聪明重要。
+  //
+  // 要一次导入多本书，直接把多个文件夹拖进窗口更合适（每个文件夹一本书）。
+  const byBook = new Map();
+  let skipped = 0;
+
+  for (const f of files) {
+    const parts = (f.webkitRelativePath || '').split('/');
+    if (parts.length < 2) { skipped++; continue; }        // 不在子目录里的
+    const book = parts[0];
+    const inner = parts.slice(1).join('/');
+    if (!book || !inner || !isTextName(inner)) { skipped++; continue; }
+    if (!byBook.has(book)) byBook.set(book, []);
+    byBook.get(book).push({ file: f, rel: inner });
+  }
+
+  if (!byBook.size) {
+    toast('这个文件夹里没有 .txt 文件。\n\n也可以直接把文件夹拖进窗口。');
+    return;
+  }
+
+  const novels = [];
+  for (const [name, list] of byBook) novels.push({ name, files: list });
+  if (skipped) toast('有 ' + skipped + ' 个非 .txt 文件已跳过', 1500);
+  ingestAll(novels, [], []);
+}
+
+// ============================================================
+// Keyboard shortcuts
+// ============================================================
+document.addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+
+  if (e.key === 'ArrowLeft') navChapter(-1);
+  else if (e.key === 'ArrowRight') navChapter(1);
+  else if (e.key === '\\') { e.preventDefault(); toggleImmersive(); }
+  else if (e.key === 'Escape') toggleImmersive(false);
+});
+</script>
+</body>
+</html>
