@@ -657,9 +657,9 @@ body.immersive .bottom-bar {
 // State
 // ============================================================
 const state = {
-  structure: null,       // { J: { 剑来: [ch1, ch2, ...] }, ... }
+  structure: null,       // { J: { 示例书名: [ch1, ch2, ...] }, ... }
   currentLetter: null,   // e.g. 'J'
-  currentNovel: null,    // e.g. '剑来'
+  currentNovel: null,    // e.g. '示例书名'
   currentChapter: null,  // e.g. '第1章 少年游.txt'
   chapterList: [],       // current novel's chapter array
   chapterIndex: -1,      // index in chapterList
@@ -1373,7 +1373,7 @@ function importFolderFiles(files) {
   //     里面的子目录原样保留（阅读器递归扫描，分卷不会被漏掉）
   //
   // 试过"如果 txt 在更深一层就把子文件夹当书"的智能识别，但它分不清
-  // 《剑来/第一卷/第一章.txt》里的"第一卷"是卷还是书 —— 信息本身不够，
+  // 《示例书名/第一卷/第一章.txt》里的"第一卷"是卷还是书 —— 信息本身不够，
   // 猜错反而更糟。可预测比聪明重要。
   //
   // 要一次导入多本书，直接把多个文件夹拖进窗口更合适（每个文件夹一本书）。
